@@ -1,8 +1,8 @@
 # OpenID Authentication for Microsoft in osTicket
 
 ### Current Version Notes:
-#### Initial Release - 2018-03-29
-#### Version .1
+#### Release - 2018-06-23
+#### Version .2
 
 * Implementation of Open ID authentication for osTicket. 
 * Tested with personal and work accounts
@@ -38,7 +38,10 @@
 * Implement ability to use custom sign-in button. Micrsosoft has described branding requirements [here](https://docs.microsoft.com/en-us/azure/active-directory/develop/active-directory-branding-guidelines). 
 * Error handling. If something doesn't map, it'll just go back to the login screen. 
 
-
+##### Update History
+* v .2 - 2018-06-23
+  * Added support to hiding local login information for osTicket-Awesome Theme
+  * Corrected issues with detecting staff or client login pages
 
 
 [screenshot]: https://raw.githubusercontent.com/cbasolutions/osTicket-Plugins/master/auth-openid-MS/img/screenshot.png
