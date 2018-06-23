@@ -2,7 +2,7 @@
 
 return array(
     'id' =>             'auth:openid-MS',
-    'version' =>        '0.1',
+    'version' =>        '0.2',
     'name' =>           'OpenID Authentication for Microsoft',
     'author' =>         'CBA Solutions',
     'description' =>    'Provides an openID authentication backend',

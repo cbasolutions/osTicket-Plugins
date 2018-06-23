@@ -12,7 +12,7 @@ class MicrosoftProviderAuth {
   function triggerAuth() {
     global $ost;
     $self = $this;
-    
+
     $redirectUri = rawurlencode(rtrim($ost->getConfig()->getURL(), '/') . '/api/auth/ext');
     $clientId = $this->config->get('CLIENT_ID');
     $clientSecret = $this->config->get('CLIENT_SECRET');
@@ -44,28 +44,48 @@ class MicrosoftProviderAuth {
 class MicrosoftOpenIDClientAuthBackend extends ExternalUserAuthenticationBackend {
   static $id = "openid_ms.client";
   static $name = "Micrsoft OpenID Auth - Client";
-  
+
   static $sign_in_image_url = "https://docs.microsoft.com/en-us/azure/active-directory/develop/media/active-directory-branding-guidelines/sign-in-with-microsoft-light.png";
   static $service_name = "Microsoft OpenID Auth - Client";
 
-    function __construct($config) {
-      $this->config = $config;
-      if ($this->config->get('HIDE_LOCAL_CLIENT_LOGIN')) {
+function __construct($config) {
+  $this->config = $config;
+  if ($_SERVER['SCRIPT_NAME'] === '/login.php' || $_SERVER['SCRIPT_NAME'] === '/open.php') {
+    setcookie('LOGIN_TYPE','CLIENT', time() + 180, "/");
+    if ($this->config->get('HIDE_LOCAL_CLIENT_LOGIN')) {
+      if ($this->config->get('PLUGIN_ENABLED_AWESOME')) {
+        ?>
+        <script>
+          window.onload = function () {
+          "use strict";
+          document.getElementById("one-view-page").remove();
+          document.getElementById("middle-view-page").remove();
+          /*something odd happens to this DIV when using these hacks.*/
+          document.getElementById("header-logo-subtitle").remove();
+          var eAuth = document.getElementsByClassName("external-auth");
+          while (eAuth[0].nextSibling) {
+            eAuth[0].nextSibling.remove();
+          }
+        };
+      </script>
+      <?php
+      } else {
         ?>
         <script>window.onload = function() {
-          var cl = document.getElementsByClassName('login-box');
-          cl[0].parentNode.removeChild(cl[0]);
-          var extAuth = document.getElementsByClassName('external-auth');
-          var nextEl = extAuth[0].nextElementSibling;
-          nextEl = nextEl.nextElementSibling;
-          nextEl.parentNode.removeChild(nextEl);
+          var loginBox = document.getElementsByClassName('login-box');
+          loginBox[0].remove();
+          var eAuth = document.getElementsByClassName('external-auth');
+          while (eAuth[0].nextSibling) {
+            eAuth[0].nextSibling.remove();
+          }
         };
         </script>
       <?php
       }
-      if ($_SERVER['PHP_SELF'] === '/login.php') setcookie('LOGIN_TYPE','CLIENT', time() + 180, "/");
-      $this->MicrosoftAuth = new MicrosoftProviderAuth($config);
     }
+  }
+  $this->MicrosoftAuth = new MicrosoftProviderAuth($config);
+}
 
     function supportsInteractiveAuthentication() {
         return false;
@@ -74,7 +94,7 @@ class MicrosoftOpenIDClientAuthBackend extends ExternalUserAuthenticationBackend
     function signOn() {
       global $errors;
       $self = $this;
-      
+
       if (isset($_SESSION[':openid-ms']['email'])) {
         // Check email for access
         $emailDomain = substr(strrchr($_SESSION[':openid-ms']['email'], "@"), 1);
@@ -110,23 +130,22 @@ class MicrosoftOpenIDStaffAuthBackend extends ExternalStaffAuthenticationBackend
   static $name = "Micrsoft OpenID Auth - Staff";
   static $service_name = "Microsoft OpenID Auth - Staff";
   static $sign_in_image_url = "https://docs.microsoft.com/en-us/azure/active-directory/develop/media/active-directory-branding-guidelines/sign-in-with-microsoft-light.png";
-  
+
   function __construct($config) {
     $this->config = $config;
     $sign_in_image_url = $this->config->get('LOGIN_LOGO');
-  
-    if ($this->config->get('HIDE_LOCAL_STAFF_LOGIN')) {
-      ?>
-      <script>window.onload = function() {
-        var elements = document.getElementById('login');
-        while(elements.length > 0){
-          elements[0].parentNode.removeChild(elements[0]);
-        }
-      };
-      </script>
-    <?php
+    if ($_SERVER['SCRIPT_NAME'] === '/scp/login.php') {
+      setcookie('LOGIN_TYPE','STAFF', time() + 180, "/");
+      if ($this->config->get('HIDE_LOCAL_STAFF_LOGIN')) {
+        ?>
+        <script>window.onload = function() {
+          var login = document.getElementById('login');
+          login.remove();
+        };
+        </script>
+      <?php
+      }
     }
-    if ($_SERVER['PHP_SELF'] === '/scp/login.php') setcookie('LOGIN_TYPE','STAFF', time() + 180, "/");
     $this->MicrosoftAuth = new MicrosoftProviderAuth($config);
   }
 

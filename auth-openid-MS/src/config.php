@@ -83,6 +83,9 @@ class OpenIDAuthMSPluginConfig extends PluginConfig {
         'hint' => $__('Comma separated values are supported.'),
         'configuration' => array('size'=>60, 'length'=>100),
       )),
+      'PLUGIN_ENABLED_AWESOME' => new BooleanField(array(
+        'label' => $__('Enable support for OSTicket Awesome theme:')
+      )),
       'PLUGIN_ENABLED_STAFF' => new BooleanField(array(
         'label' => $__('Enable for staff login:')
       )),
