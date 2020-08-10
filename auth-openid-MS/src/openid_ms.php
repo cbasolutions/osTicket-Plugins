@@ -1,19 +1,26 @@
 <?php
 
+include_once 'curl_util.php';
+
+define('DEBUGGING', TRUE);
+
 class MicrosoftProviderAuth {
 
   var $config;
   var $access_token;
+  var $login_type;
 
-  function __construct($config) {
+  function __construct($config, $login_type) {
     $this->config = $config;
+    $this->login_type = $login_type;
   }
 
-  function triggerAuth() {
+    function triggerAuth() {
     global $ost;
     $self = $this;
 
     $redirectUri = rawurlencode(rtrim($ost->getConfig()->getURL(), '/') . '/api/auth/ext');
+    $redirectUriNonEncoded = rtrim($ost->getConfig()->getURL(), '/') . '/api/auth/ext';
     $clientId = $this->config->get('CLIENT_ID');
     $clientSecret = $this->config->get('CLIENT_SECRET');
     $scopes = rawurlencode($this->config->get('SCOPES'));
@@ -24,20 +31,99 @@ class MicrosoftProviderAuth {
       header('Location: ' . $authUrl);
       exit;
     } else {
-      //TDOD - Implement real JWT validation
-      $jwt = explode('.', $_REQUEST['id_token']);
-      $authInfo = json_decode(base64_decode($jwt[1]), true);
-      $_SESSION[':openid-ms']['name'] = $authInfo['name'];
-      $_SESSION[':openid-ms']['oid'] = $authInfo['oid'];
-      if (isset($authInfo['email'])) {
+
+        //INFORMATII DUPA AUTENTIFICARE
+        //NU CONTIN INFORMATII AMANUNTITE ( CUM SUNT CELE PRIMITE DIN MICROSOFT GRAPH DE MAI JOS)
+
+        //TDOD - Implement real JWT validation
+
+        /*
+        $_SESSION[':id_token'] = $_REQUEST['id_token'];
+        $_SESSION[':code'] = $_REQUEST['code'];
+        $_SESSION[':jwt1'] = json_decode(base64_decode($jwt[0]), true);
+        $_SESSION[':jwt2'] = json_decode(base64_decode($jwt[1]), true);
+        $_SESSION[':jwt3'] = json_decode(base64_decode($jwt[2]), true);
+        */
+
+
+        $jwt = explode('.', $_REQUEST['id_token']);
+        $authInfo = json_decode(base64_decode($jwt[1]), true);
+
+        $_SESSION[':authInfo'] = $authInfo;
+        $_SESSION[':openid-ms']['name'] = $authInfo['name'];
+        $_SESSION[':openid-ms']['oid'] = $authInfo['oid'];
+        if (isset($authInfo['email'])) {
         $_SESSION[':openid-ms']['email'] = $authInfo['email'];
-      } elseif (isset($authInfo['preferred_username']) && (filter_var($authInfo['preferred_username'], FILTER_VALIDATE_EMAIL))) {
+        } elseif (isset($authInfo['preferred_username']) && (filter_var($authInfo['preferred_username'], FILTER_VALIDATE_EMAIL))) {
         $_SESSION[':openid-ms']['email'] = $authInfo['preferred_username'];
-      }
-      $_SESSION[':openid-ms']['nonce'] = $authInfo['nonce'];
-      if ($_COOKIE['LOGIN_TYPE'] === 'CLIENT') header('Location: /login.php');
-      if ($_COOKIE['LOGIN_TYPE'] === 'STAFF') header('Location: /scp/login.php');
-      exit;
+        }
+        $_SESSION[':openid-ms']['nonce'] = $authInfo['nonce'];
+
+        //Login type
+        //Redirectare
+        //POSIBILA PROBLEMA DIN CAUZA INVALIDARII RAPIDE A COOKIE-URILOR
+
+        //if ($_COOKIE['LOGIN_TYPE'] === 'CLIENT') header('Location: /login.php');
+        //if ($_COOKIE['LOGIN_TYPE'] === 'STAFF') header('Location: /scp/login.php');
+
+
+      /*
+       * Obtinem codul de acces al utilizatorului
+       */
+
+        // Primire access token --- INFO: https://docs.microsoft.com/en-us/graph/auth-v2-user
+
+        //$_SESSION[':redirectUri'] = $redirectUri;
+        //$_SESSION[':redirectUri2'] = rtrim($ost->getConfig()->getURL(), '/') . '/api/auth/ext';
+        $post_fields = array(
+                'grant_type' => 'authorization_code',
+                'code' => $_REQUEST['code'], // codul primit din pasul de autorizare de mai devreme
+                'client_secret' => $clientSecret,
+                'client_id' => $clientId,
+                'scope' => $this->config->get('SCOPES'),
+                'redirect_uri' => $redirectUriNonEncoded
+        );
+
+        // Url access token
+        $url = $this->config->get('AUTHORITY_URL')
+          . $this->config->get('ACCESS_ENDPOINT');
+
+        // Curl post pentru obtinerea unui access_token
+        $result = curl_post($url, $post_fields);
+        //$_SESSION[':AccessURL'] = $url;
+        //$_SESSION[':AccessResponse'] = $result;
+
+        $json_info = json_decode($result, true);
+        $access_token = $json_info['access_token'];
+        $access_type = $json_info['token_type']; // Azure suporta doar Bearer type
+        $_SESSION[':access_token'] = $access_token;
+        //$_SESSION[':access_type'] = $access_type;
+
+        /*
+         * Obtinem profilul utilizatorului
+         */
+
+        // Setam codul de autorizare in header
+        $headers = array(
+            'Authorization: '. $access_type. ' ' .$access_token
+        );
+
+        //$_SESSION[':graphHeaders'] = $headers;
+
+        // Curl get pentru obtinerea profilului
+        $result = curl_get($this->config->get('RESOURCES_URL'), $headers);
+
+        // Salvare informatii user
+        $_SESSION[':profile'] = $result;
+
+        if($this->login_type == 'CLIENT') {
+            Http::redirect(ROOT_PATH . 'profile.php');
+        }
+        else if($this->login_type == 'STAFF'){
+            Http::redirect(ROOT_PATH . 'scp/login.php');
+        }
+
+        exit;
     }
   }
 }
@@ -84,7 +170,7 @@ function __construct($config) {
       }
     }
   }
-  $this->MicrosoftAuth = new MicrosoftProviderAuth($config);
+  $this->MicrosoftAuth = new MicrosoftProviderAuth($config, 'CLIENT');
 }
 
     function supportsInteractiveAuthentication() {
@@ -146,7 +232,7 @@ class MicrosoftOpenIDStaffAuthBackend extends ExternalStaffAuthenticationBackend
       <?php
       }
     }
-    $this->MicrosoftAuth = new MicrosoftProviderAuth($config);
+    $this->MicrosoftAuth = new MicrosoftProviderAuth($config, 'STAFF');
   }
 
   function supportsInteractiveAuthentication() {

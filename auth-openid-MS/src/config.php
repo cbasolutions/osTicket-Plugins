@@ -49,6 +49,18 @@ class OpenIDAuthMSPluginConfig extends PluginConfig {
         'hint' => $__('This will form the rest of the authorization URL. E.g., /oauth2/v2.0/authorize'),
         'configuration' => array('size'=>60, 'length'=>100),
       )),
+      'ACCESS_ENDPOINT' => new TextboxField(array(
+        'label' => $__('Access Token Endpoint'),
+        'required'=>true,
+        'hint' => $__('This will form the rest of the access URL. E.g., /oauth2/v2.0/token'),
+        'configuration' => array('size'=>60, 'length'=>100),
+      )),
+      'RESOURCES_URL' => new TextboxField(array(
+        'label' => $__('Resources URL'),
+        'required'=>true,
+        'hint' => $__('This will query the user data. E.g., https://graph.microsoft.com/v1.0/me'),
+        'configuration' => array('size'=>60, 'length'=>100),
+      )),
       /*'TOKEN_ENDPOINT' => new TextboxField(array(
         'label' => $__('Token Endpoint'),
         'required'=>true,
