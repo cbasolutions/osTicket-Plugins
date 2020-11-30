@@ -35,7 +35,10 @@ class MicrosoftProviderAuth {
         $_SESSION[':openid-ms']['email'] = $authInfo['preferred_username'];
       }
       $_SESSION[':openid-ms']['nonce'] = $authInfo['nonce'];
-      if ($_COOKIE['LOGIN_TYPE'] === 'CLIENT') header('Location: /login.php');
+      $home_url = rtrim($ost->getConfig()->getURL(), '/');
+      $sections = parse_url($home_url);
+      $osticket_path = isset($sections["path"])?$sections["path"]:"";
+      if ($_COOKIE['LOGIN_TYPE'] === 'CLIENT') header('Location: '.$osticket_path.'/login.php');
       if ($_COOKIE['LOGIN_TYPE'] === 'STAFF') header('Location: /scp/login.php');
       exit;
     }
@@ -50,7 +53,7 @@ class MicrosoftOpenIDClientAuthBackend extends ExternalUserAuthenticationBackend
 
 function __construct($config) {
   $this->config = $config;
-  if ($_SERVER['SCRIPT_NAME'] === '/login.php' || $_SERVER['SCRIPT_NAME'] === '/open.php') {
+  if (strpos($_SERVER['SCRIPT_NAME'],'/login.php') !== false || strpos($_SERVER['SCRIPT_NAME'],'/open.php') !== false) {
     setcookie('LOGIN_TYPE','CLIENT', time() + 180, "/");
     if ($this->config->get('HIDE_LOCAL_CLIENT_LOGIN')) {
       if ($this->config->get('PLUGIN_ENABLED_AWESOME')) {
