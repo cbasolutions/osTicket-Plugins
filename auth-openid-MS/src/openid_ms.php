@@ -53,7 +53,7 @@ class MicrosoftOpenIDClientAuthBackend extends ExternalUserAuthenticationBackend
 
 function __construct($config) {
   $this->config = $config;
-  if (strpos($_SERVER['SCRIPT_NAME'],'/login.php') !== false || strpos($_SERVER['SCRIPT_NAME'],'/open.php') !== false) {
+  if ((strpos($_SERVER['SCRIPT_NAME'],'/login.php') !== false || strpos($_SERVER['SCRIPT_NAME'],'/open.php') !== false) && $_SERVER['SCRIPT_NAME'] !== '/scp/login.php') {
     setcookie('LOGIN_TYPE','CLIENT', time() + 180, "/");
     if ($this->config->get('HIDE_LOCAL_CLIENT_LOGIN')) {
       if ($this->config->get('PLUGIN_ENABLED_AWESOME')) {
@@ -175,7 +175,7 @@ class MicrosoftOpenIDStaffAuthBackend extends ExternalStaffAuthenticationBackend
       }
     }
   }
-  
+
   static function signOut($user) {
     parent::signOut($user);
     unset($_SESSION[':openid-ms']);
