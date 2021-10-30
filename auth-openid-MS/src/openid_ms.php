@@ -1,5 +1,14 @@
 <?php
 
+// Enumeration-type abstract class just for defining to set of possible login types
+abstract class LoginType
+{
+    // - End user:
+    const CLIENT = 0;
+    // - Agent/Admin user:
+    const STAFF = 1;
+}
+
 class MicrosoftProviderAuth {
 
   var $config;
@@ -9,22 +18,29 @@ class MicrosoftProviderAuth {
     $this->config = $config;
   }
 
-  function triggerAuth() {
+  function triggerAuth($login_type = LoginType::CLIENT) {
     global $ost;
     $self = $this;
 
-    $redirectUri = rawurlencode(rtrim($ost->getConfig()->getURL(), '/') . '/api/auth/ext');
-    $clientId = $this->config->get('CLIENT_ID');
-    $clientSecret = $this->config->get('CLIENT_SECRET');
-    $scopes = rawurlencode($this->config->get('SCOPES'));
-    $resourceUrl = $this->config->get('RESOURCE_ID') . $this->config->get('RESOURCE_ENDPOINT');
-    $nonce = $_COOKIE['OSTSESSID'];
+    $home_url = rtrim($ost->getConfig()->getURL(), '/');
+    $home_url_sections = parse_url($home_url);
+    $home_url_path = isset($home_url_sections["path"]) ? $home_url_sections["path"] : "";
+
     if (!isset($_REQUEST['id_token'])) {
-      $authUrl = $this->config->get('AUTHORITY_URL') . $this->config->get('AUTHORIZE_ENDPOINT') . '?client_id='. $clientId . '&response_type=id_token%20code&redirect_uri=' . $redirectUri . '&response_mode=form_post&scope=' . $scopes . '&state=12345&nonce=' . $nonce;
+      $redirect_url = $home_url . '/api/auth/ext';
+      $clientId = $this->config->get('CLIENT_ID');
+      $scopes = $this->config->get('SCOPES');
+      // N.B.: Completely regenerate the current session id to ensure the session is now all clean and valid
+      $ost->session->regenerate_id();
+      $nonce = session_id();
+      $authUrl = $this->config->get('AUTHORITY_URL') . $this->config->get('AUTHORIZE_ENDPOINT') . '?client_id='. rawurlencode($clientId) .
+        '&response_type=id_token%20code&redirect_uri=' . rawurlencode($redirect_url) . '&response_mode=form_post&scope=' . rawurlencode($scopes) .
+        '&state=12345&nonce=' . rawurlencode($nonce);
       header('Location: ' . $authUrl);
+      //error_log(__FILE__ . ":" . __LINE__ . " - " . __CLASS__ . "::" . __METHOD__ . " - exit #01 - headers_list(): \"" . print_r(headers_list(), TRUE) . "\"");
       exit;
     } else {
-      //TDOD - Implement real JWT validation
+      //TODO - Implement real JWT validation
       $jwt = explode('.', $_REQUEST['id_token']);
       $authInfo = json_decode(base64_decode($jwt[1]), true);
       $_SESSION[':openid-ms']['name'] = $authInfo['name'];
@@ -35,12 +51,14 @@ class MicrosoftProviderAuth {
         $_SESSION[':openid-ms']['email'] = $authInfo['preferred_username'];
       }
       $_SESSION[':openid-ms']['nonce'] = $authInfo['nonce'];
-      if ($_COOKIE['LOGIN_TYPE'] === 'CLIENT') header('Location: /login.php');
-      if ($_COOKIE['LOGIN_TYPE'] === 'STAFF') header('Location: /scp/login.php');
+      header('Location: ' . $home_url_path . ( $login_type === LoginType::STAFF ? '/scp' : '' ) . '/login.php');
+      //error_log(__FILE__ . ":" . __LINE__ . " - " . __CLASS__ . "::" . __METHOD__ . " - exit #02 - headers_list(): \"" . print_r(headers_list(), TRUE) . "\"");
       exit;
     }
   }
 }
+
+
 class MicrosoftOpenIDClientAuthBackend extends ExternalUserAuthenticationBackend {
   static $id = "openid_ms.client";
   static $name = "Micrsoft OpenID Auth - Client";
@@ -50,8 +68,8 @@ class MicrosoftOpenIDClientAuthBackend extends ExternalUserAuthenticationBackend
 
 function __construct($config) {
   $this->config = $config;
-  if ($_SERVER['SCRIPT_NAME'] === '/login.php' || $_SERVER['SCRIPT_NAME'] === '/open.php') {
-    setcookie('LOGIN_TYPE','CLIENT', time() + 180, "/");
+  # N.B.: check that "$_SERVER['SCRIPT_NAME']" ends with '/login.php' or '/open.php' or '/index.php', but without '/scp' just before (e.g. not ending with '/scp/login.php'):
+  if (preg_match("#(?<!\/scp)\/(login|open|index)\.php$#", $_SERVER['SCRIPT_NAME'])) {
     if ($this->config->get('HIDE_LOCAL_CLIENT_LOGIN')) {
       if ($this->config->get('PLUGIN_ENABLED_AWESOME')) {
         ?>
@@ -121,9 +139,10 @@ function __construct($config) {
 
   function triggerAuth() {
     parent::triggerAuth();
-    $MicrosoftAuth = $this->MicrosoftAuth->triggerAuth();
+    $MicrosoftAuth = $this->MicrosoftAuth->triggerAuth(LoginType::CLIENT);
   }
 }
+
 
 class MicrosoftOpenIDStaffAuthBackend extends ExternalStaffAuthenticationBackend {
   static $id = "openid_ms.staff";
@@ -134,8 +153,8 @@ class MicrosoftOpenIDStaffAuthBackend extends ExternalStaffAuthenticationBackend
   function __construct($config) {
     $this->config = $config;
     $sign_in_image_url = $this->config->get('LOGIN_LOGO');
-    if ($_SERVER['SCRIPT_NAME'] === '/scp/login.php') {
-      setcookie('LOGIN_TYPE','STAFF', time() + 180, "/");
+    # N.B.: check that "$_SERVER['SCRIPT_NAME']" ends with '/scp/login.php' or '/scp/index.php':
+    if (preg_match("#/scp/(login|index)\.php$#", $_SERVER['SCRIPT_NAME'])) {
       if ($this->config->get('HIDE_LOCAL_STAFF_LOGIN')) {
         ?>
         <script>window.onload = function() {
@@ -181,6 +200,6 @@ class MicrosoftOpenIDStaffAuthBackend extends ExternalStaffAuthenticationBackend
 
   function triggerAuth() {
     parent::triggerAuth();
-    $MicrosoftAuth = $this->MicrosoftAuth->triggerAuth();
+    $MicrosoftAuth = $this->MicrosoftAuth->triggerAuth(LoginType::STAFF);
   }
 }
